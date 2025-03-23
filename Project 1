@@ -1,0 +1,72 @@
+import { useState, useEffect } from "react";
+import { io } from "socket.io-client";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+
+const socket = io("http://localhost:4000");
+
+export default function MathBattle() {
+  const [status, setStatus] = useState("Click to Find Match");
+  const [problem, setProblem] = useState(null);
+  const [opponent, setOpponent] = useState(null);
+  const [userAnswer, setUserAnswer] = useState("");
+  const [turn, setTurn] = useState(false);
+  const [gameOver, setGameOver] = useState(null);
+
+  useEffect(() => {
+    socket.on("match_found", ({ opponent, problem, turn }) => {
+      setStatus("Match Found! Battle Begins");
+      setOpponent(opponent);
+      setProblem(problem);
+      setTurn(turn);
+    });
+
+    socket.on("new_problem", ({ problem, turn }) => {
+      setProblem(problem);
+      setTurn(turn);
+      setUserAnswer("");
+    });
+
+    socket.on("game_over", ({ result }) => {
+      setGameOver(result === "win" ? "🎉 You Won!" : "😢 You Lost!");
+      setTurn(false);
+    });
+  }, []);
+
+  const findMatch = () => {
+    setStatus("Finding Opponent...");
+    socket.emit("find_match");
+  };
+
+  const submitAnswer = () => {
+    if (!turn || gameOver) return;
+    socket.emit("submit_answer", { answer: userAnswer });
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
+      <h1 className="text-2xl font-bold mb-6">Dive yourself in the competition</h1>
+      <Card className="p-6 w-96 text-center shadow-lg">
+        <h2 className="text-xl font-bold">Aptitude Battle</h2>
+        <p className="my-4 text-lg">{status}</p>
+        {!problem && <Button onClick={findMatch}>Find Match</Button>}
+        {problem && (
+          <>
+            <p className="text-lg my-4">{problem.question}</p>
+            <input
+              type="text"
+              className="border p-2 rounded w-full"
+              value={userAnswer}
+              onChange={(e) => setUserAnswer(e.target.value)}
+              disabled={!turn || gameOver}
+            />
+            <Button className="mt-4 w-full" onClick={submitAnswer} disabled={!turn || gameOver}>
+              Submit Answer
+            </Button>
+            {gameOver && <p className="mt-4 font-bold text-red-600">{gameOver}</p>}
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}
